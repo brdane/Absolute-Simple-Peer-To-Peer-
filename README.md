@@ -1,4 +1,4 @@
-# Absolute Simple Peer To Peer (ASPTP)
+# Absolute Simple Peer To Peer (ASPTP) v1.0.0
 C++ Library by: Brenden Dane
 
 
@@ -17,4 +17,9 @@ If you have any questions whatsoever, feel free to contact me.
 
 Email: brdane@gmail.com
 Instagram: @spankedcheese
+
+PayPal: brdane@gmail.com
+Bitcoin: 172aAiHgmnSZexoieWw97qm9Ztpn8Gna5C
+Litecoin: LKVqoLLaWhTbCskDJzH87PMeXuw8f3gFT9
+Ethereum: 0xd28621824c85084ef8694e06e31C8590aaf4b5c8
 
