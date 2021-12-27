@@ -10,7 +10,7 @@ directly to another system.
 
 I wrote this library as a frustrated programmer who couldn't find any already made, super bare-bones simple library for P2P connections
 and communication. So, I made one myself and kept it as SUPER simple as I could. I've commented everything I possibly could and explained
-everything in the simplest for to where a beginner programmer can understand. 
+everything in the simplest form to where a beginner programmer can understand. 
 
 
 If you have any questions whatsoever, feel free to contact me.
