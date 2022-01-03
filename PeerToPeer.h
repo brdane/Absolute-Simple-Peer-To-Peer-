@@ -15,19 +15,11 @@ me.
 Email: brdane@gmail.com
 Instagram: @spankedcheese
 
-
-If you'd like to send some pizza money my way, I'd appreciate it.. Thank you.
-
-PayPal: brdane@gmail.com
-Bitcoin: 172aAiHgmnSZexoieWw97qm9Ztpn8Gna5C
-Litecoin: LKVqoLLaWhTbCskDJzH87PMeXuw8f3gFT9
-Ethereum: 0xd28621824c85084ef8694e06e31C8590aaf4b5c8
-
 */
 
 
 
-//I probably don't need all of these libraries, but better to be safe than sorry.
+//I probably don't need all of this, but better to be safe than sorry.
 #include <string>
 #include <fstream>
 
@@ -43,33 +35,28 @@ Ethereum: 0xd28621824c85084ef8694e06e31C8590aaf4b5c8
 
 #include<winsock2.h>
 #include<ws2tcpip.h>
+#include <sys/stat.h>
 
 #pragma comment(lib,"ws2_32.lib")
 
 using namespace std;
 
-//A simple structure for our client information.
 struct client
 {
     int host;
     short port;
 };
 
-
 struct client server;
 
-bool bConnected; //Used by Connect(), I can call connect(), but not this.
+bool bConnected;
 
-WSADATA wsa; //Basic structure that contains socket information.
-struct sockaddr_in si_me, si_other; //Pointers to both your ip address and the last ip you received data from.
+WSADATA wsa;
+struct sockaddr_in si_me, si_other;
+int s, slen;
 
-int s; //Our socket.
-
-int slen; //Length of si_other.
-
-#define BUFLEN 4096 //The size of each message that we receive. Feel free to change depending on your application.
-
-char buf[BUFLEN]; //A char array that our received message/data goes into.
+#define BUFLEN 4096
+char buf[BUFLEN];
 
 //Let's you know if you are connected to a socket or not.
 bool Connected()
@@ -96,20 +83,17 @@ sockaddr_in ServerNetwork()
 }
 
 //Connects to a port of your choosing to create the hole-punch.
-void Connect(unsigned short ip_port)
+bool Connect(unsigned short ip_port)
 {
-	//If we are already connected, then don't try to connect again.
 	if (bConnected)
-		return;
+		return false;
 
-	
 	if (!bConnected)
 	{
 		if (WSAStartup(MAKEWORD(2,2),&wsa) != 0)
 		{
 		}
-		
-		//Create our socket.
+
 		if ( (s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1)
 		{
 		}
@@ -120,35 +104,28 @@ void Connect(unsigned short ip_port)
 			si_me.sin_port = htons(ip_port); // This is not really necessary, we can also use 0 (any ip_port)
 			si_me.sin_addr.s_addr = htonl(INADDR_ANY);
 
-			//If we can't bind and activate our socket, error out and exit.
 			if( bind(s ,(struct sockaddr *)&si_me , sizeof(si_me)) == SOCKET_ERROR)
 			{
 				printf("Bind failed with error code : %d" , WSAGetLastError());
-				return;
+				return false;
 			}
-			
-			//Obtain the size of the pointer to the other ip.
+
 			slen = sizeof(si_other);
-			
-			//Set out connected bool to true.
 			bConnected = true;
 		}
 	}
+	return true;
 }
 
 //Send data to an IP of your choice. 
 bool SendToIp(char* server_ip, const char* message)
 {
 
-	//If we don't have an active connection, don't go any further.
 	if (!bConnected)
 		return false;
 
-	//Convert the server_ip parameter.
 	server_ip = (char *)(LPCTSTR)server_ip;
 
-	//Setup our si_other pointer and put in our server_ip
-	//parameter.
 	memset((char *) &si_other, 0, sizeof(si_other));
 	si_other.sin_family = AF_INET;
 	si_other.sin_port = si_me.sin_port;
@@ -156,7 +133,6 @@ bool SendToIp(char* server_ip, const char* message)
 	server.host = si_other.sin_addr.s_addr;
 	server.port = si_other.sin_port;
 
-	//If the message doesn't go through, return false.
 	if (sendto(s, message, strlen(message), 0, (struct sockaddr*)(&si_other), slen) == -1)
 	{
 		return false;
@@ -170,19 +146,14 @@ bool SendToIp(char* server_ip, const char* message)
 //Returns true if you receive data in your connected socket, also returns the data that you received.
 bool received(char* &msg)
 {
-	//Check to see if received something on our socket, if so, point our buf variable to it
-	//and set fill it with BUFLEN. Also, set si_other with information on who sent the data
-	//we received.
-	if (recvfrom(GetSocket(), buf, BUFLEN, 0, (struct sockaddr *) &si_other, &slen) != -1)
+	if (recvfrom(GetSocket(), buf, 4096, 0, (struct sockaddr *) &si_other, &slen) != -1)
 	{
-		//Fetch the data we received to the msg parameter.
+
 		msg = buf;
-		
-		//return true to let the programmer know that something was received.
-		return true; 
+		return true;
 	}
 else
-	{	//Otherwise, return false.
+	{
 		return false;
 	}
 }
@@ -244,8 +215,96 @@ bool SameThing(const char* in1, const char* in2)
 }
 
 //Let's you know if a specified file exists.
-bool fileexists (const std::string& name) 
+bool fileexists (CString name) 
 {
-    ifstream f(name.c_str());
-    return f.good();
+    struct stat buffer;
+    return (stat (name, &buffer) ==0);
+}
+
+//Load an entire file into a string.
+std::string loadfile(CString name) 
+{
+	std::string contents;
+	
+    if (fileexists(name))
+	{
+		ifstream input(name);
+		
+		for (std::string line; getline(input, line); )
+		{
+		 contents += line;	
+		}
+	}
+    return contents;
+}
+
+//Loads a file (configfile, if it can find it) and looks for a keyword (value)
+//that has '=' after it, and reads whatever text comes after the '='. If
+//it finds anything, it will set what it finds to the result variable and 
+//return true to let the user know that it indeed found something.
+//This is usually used for INI configuration files, but the format can be
+//anything.
+bool getconfig(CString configfile, CString value, CString &result ) 
+{
+	std::string contents;
+
+	bool bResult = false;
+	
+    if (fileexists(configfile))
+	{
+		ifstream input(configfile);
+		
+		for (std::string line; getline(input, line);)
+		{
+		 if (line.substr(0,value.GetLength()) == (LPCSTR)value)
+		 {
+			 result = line.substr(value.GetLength()+1,line.length() - value.GetLength()-1).c_str();
+
+			 if (result.GetLength() > 0)
+				bResult = true;
+		 }
+		}
+	}
+    return bResult;
+}
+
+//A useful CString to Unsigned Short converting function that I whipped together.
+//Used this for fetching port numbers from strings.
+unsigned short cstous(CString in)
+{
+	return (unsigned short)strtol(in.GetBuffer(in.GetLength()),NULL,10);
+}
+
+
+//Same as received(), but this has the ability to timeout.
+bool received_timeout(char* &msg, long sec, long usec)
+{
+   fd_set readfds, masterfds;
+   struct timeval timeout={sec,usec};
+ 
+   if (!Connected())
+	   return false;
+
+   FD_ZERO(&masterfds);
+   FD_SET(GetSocket(), &masterfds);
+
+   memcpy(&readfds, &masterfds, sizeof(fd_set));
+
+   if (select(GetSocket()+1, &readfds, NULL, NULL, &timeout) < 0)
+   {
+     return false;
+   }
+
+   if (FD_ISSET(GetSocket(), &readfds))
+   {
+		if (recvfrom(GetSocket(), buf, 4096, 0, (struct sockaddr *) &si_other, &slen) != 1)
+		{
+			msg = buf;
+			return true;
+		}
+	 else
+		 return false;
+   }
+	else
+		return false;
 }
