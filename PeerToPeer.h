@@ -32,7 +32,6 @@ Ethereum: 0xd28621824c85084ef8694e06e31C8590aaf4b5c8
 #include<string.h>
 #include <iostream>
 #include <fstream>
-#include "stdstring.h"
 
 
 #include <time.h>
