@@ -27,6 +27,8 @@ Instagram: @spankedcheese
 #include<string.h>
 #include <iostream>
 #include <fstream>
+#include "stdstring.h"
+
 
 #include <time.h>
 
@@ -238,6 +240,64 @@ std::string loadfile(CString name)
     return contents;
 }
 
+//Quick-and-easy file-writing function. Only writes a new file,
+//and will not work if the file name specified already exists.
+bool writefile(CString name, CString contents)
+{
+	if (name == "")
+		return false;
+
+	if (contents == "")
+		return false;
+
+	if (fileexists(name))
+		return false;
+
+	ofstream MyFile(name);
+	MyFile << contents;
+	MyFile.close();
+	return true;
+}
+
+//Quick-and-easy function that writes to the end of a file. Only
+//writes to files that already exist.
+bool appendfile(CString name, CString contents)
+{
+	if (name == "")
+		return false;
+
+	if (contents == "")
+		return false;
+
+	if (!fileexists(name))
+		return false;
+
+	ofstream MyFile(name);
+	MyFile << contents;
+	MyFile.close();
+	return true;
+}
+
+//Quick-and-easy function that searches for text in a file.
+//returns true if it finds some. Super freaking simple.
+bool foundinfile(CString name, CString contents)
+{
+	if (name == "")
+		return false;
+
+	if (contents == "")
+		return false;
+
+	if (!fileexists(name))
+		return false;
+
+	std::string searching = loadfile(name);
+
+	return (searching.find(contents) != string::npos );
+
+}
+
+
 //Loads a file (configfile, if it can find it) and looks for a keyword (value)
 //that has '=' after it, and reads whatever text comes after the '='. If
 //it finds anything, it will set what it finds to the result variable and 
@@ -308,3 +368,31 @@ bool received_timeout(char* &msg, long sec, long usec)
 	else
 		return false;
 }
+
+CString EpochSeconds()
+{
+	CString f;
+	time_t result = time(NULL);
+    asctime(localtime(&result));
+
+	char temp[20];
+	long ld = result;
+	sprintf(temp,"%ld",ld);
+
+	f += temp;
+
+	return f;
+
+	
+}
+
+//-Added EpochSeconds(), returns the current time in Epoch format, as a CString.
+//-Added Basic file-handling functions that return true or false if they successfully processed.
+//-File-handling functions are loadfile(), writefile(), appendfile() and foundinfile().
+//-Now featuring a Command Prompt-friendly version of this library, PeerToPeer_Win32.h, that uses 
+// CString as a substitute for CString, which is used in MFC Applications. I did that because
+// I have had trouble trying to load CStrings into console applications.
+//-Added an example MFC program that does Peer-to-Peer chat, used port 6969 as an example.
+// Type in a username, and IP to send a message to and the message itself.
+// When you receive a message, you don't need to type in an IP, the program will send your message
+// to the last IP you received a message to.
