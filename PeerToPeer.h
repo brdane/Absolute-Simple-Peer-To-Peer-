@@ -44,6 +44,7 @@ Ethereum: 0xd28621824c85084ef8694e06e31C8590aaf4b5c8
 #include <sys/stat.h>
 
 #pragma comment(lib,"ws2_32.lib")
+#pragma comment(lib,"wininet.lib")
 
 using namespace std;
 
@@ -63,6 +64,31 @@ int s, slen;
 
 #define BUFLEN 4096
 char buf[BUFLEN];
+
+std::string MyIP()
+{
+
+    HINTERNET net = InternetOpen("IP retriever",
+        INTERNET_OPEN_TYPE_PRECONFIG,
+        NULL,
+        NULL,
+        0);
+
+    HINTERNET conn = InternetOpenUrl(net, 
+                                     "http://myexternalip.com/raw", 
+                                      NULL, 
+                                      0, 
+                                      INTERNET_FLAG_RELOAD, 
+                                      0);
+
+    char buffer[4096];
+    DWORD read;
+
+    InternetReadFile(conn, buffer, sizeof(buffer)/sizeof(buffer[0]), &read);
+    InternetCloseHandle(net);    
+
+    return std::string(buffer, read);
+}
 
 //Let's you know if you are connected to a socket or not.
 bool Connected()
@@ -390,6 +416,26 @@ CString EpochSeconds()
 	
 }
 
+//Takes a float and turns it to bytes, handy for writing it to a file or a string
+//for later parsing and packet-sending, etc.
+byte* floatToBytes(float thefloat)
+{
+	byte* out;
+
+	for (int i=0; i < sizeof(thefloat); i++)
+		out[i] = ((byte*)&thefloat)[i];
+
+	return out;
+}
+
+//Takes an array of bytes that <we assume> define a float, and turn them into
+//a readable float. handy for parsing strings, receiving packets, etc.
+float bytesToFloat(byte* floatdata)
+{
+	return *(float*)&floatdata;
+}
+
+//-Added float to byte conversion to send/receive in packet-form.
 //-Added EpochSeconds(), returns the current time in Epoch format, as a CString.
 //-Added Basic file-handling functions that return true or false if they successfully processed.
 //-File-handling functions are loadfile(), writefile(), appendfile() and foundinfile().
@@ -400,3 +446,4 @@ CString EpochSeconds()
 // Type in a username, and IP to send a message to and the message itself.
 // When you receive a message, you don't need to type in an IP, the program will send your message
 // to the last IP you received a message to.
+
