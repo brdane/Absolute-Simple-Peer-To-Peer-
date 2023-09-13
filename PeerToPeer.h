@@ -1,25 +1,20 @@
 /*
-Absolute Simple Peer-To-Peer (ASPTP) library is an incredibly simple library for C++ programming, 
+Absolute Simple Peer-To-Peer (ASPTP) library is an incredibly simple library for C++ programming,
 to exchange data between computers, with no main-server or middleman required, via peer-to-peer protocol.
-The method used with this library is through UDP hole-punching, which basically temporarily makes an exception 
+The method used with this library is through UDP hole-punching, which basically temporarily makes an exception
 in your network's firewall and opens a specified port and socket, in-order to communicate directly to another system.
-
 I wrote this library as a frustrated programmer who couldn't find any already made, super bare-bones simple library for
-P2P connections and communication. So, I made one myself and kept it as SUPER simple as I could. I've commented everything 
+P2P connections and communication. So, I made one myself and kept it as SUPER simple as I could. I've commented everything
 I possibly could and explained everything in the simplest form to where a beginner programmer can understand.
-
 If you have any questions whatsoever, feel free to contact me.
 
-Email: brdane@gmail.com Instagram: @spankedcheese
 
+Email: brdane@gmail.com
+Instagram: @spankedcheese
 PayPal: brdane@gmail.com
-
 Bitcoin: 172aAiHgmnSZexoieWw97qm9Ztpn8Gna5C
-
 Litecoin: LKVqoLLaWhTbCskDJzH87PMeXuw8f3gFT9
-
 Ethereum: 0xd28621824c85084ef8694e06e31C8590aaf4b5c8
-
 */
 
 
@@ -32,7 +27,7 @@ Ethereum: 0xd28621824c85084ef8694e06e31C8590aaf4b5c8
 #include<string.h>
 #include <iostream>
 #include <fstream>
-
+#include <vector>
 
 #include <time.h>
 
@@ -41,59 +36,52 @@ Ethereum: 0xd28621824c85084ef8694e06e31C8590aaf4b5c8
 
 #include<winsock2.h>
 #include<ws2tcpip.h>
+#include<wininet.h>
 #include <sys/stat.h>
 
 #pragma comment(lib,"ws2_32.lib")
 #pragma comment(lib,"wininet.lib")
 
-using namespace std;
-
 struct client
 {
-    int host;
-    short port;
+	int host;
+	short port;
 };
 
 struct client server;
 
-bool bConnected;
+bool bConnected = false;
+
 
 WSADATA wsa;
 struct sockaddr_in si_me, si_other;
-int s, slen;
+SOCKET s = 0;
+int slen;
 
 #define BUFLEN 4096
 char buf[BUFLEN];
 
+char* lastSent;
+
+std::string outputboi;
+
 std::string MyIP()
 {
 
-    HINTERNET net = InternetOpen("IP retriever",
-        INTERNET_OPEN_TYPE_PRECONFIG,
-        NULL,
-        NULL,
-        0);
+	HINTERNET net = InternetOpen("IP retriever", INTERNET_OPEN_TYPE_PRECONFIG, NULL, NULL, 0);
 
-    HINTERNET conn = InternetOpenUrl(net, 
-                                     "http://myexternalip.com/raw", 
-                                      NULL, 
-                                      0, 
-                                      INTERNET_FLAG_RELOAD, 
-                                      0);
+	//InternetSetOption(net, INTERNET_OPTION_CONNECT_TIMEOUT, (DWORD)2000, sizeof( (DWORD)2000) );
 
-    char buffer[4096];
-    DWORD read;
+	HINTERNET conn = InternetOpenUrl(net, "http://myexternalip.com/raw", NULL, 0, INTERNET_FLAG_RELOAD, 0);
 
-    InternetReadFile(conn, buffer, sizeof(buffer)/sizeof(buffer[0]), &read);
-    InternetCloseHandle(net);    
+	char buffer[BUFLEN];
+	DWORD read;
 
-    return std::string(buffer, read);
-}
+	InternetReadFile(conn, buffer, sizeof(buffer) / sizeof(buffer[0]), &read);
+	InternetCloseHandle(net);
 
-//Let's you know if you are connected to a socket or not.
-bool Connected()
-{
-	return bConnected;
+	return std::string(buffer, read);
+
 }
 
 //A pointer to the socket for the P2P connection, if you're connected.
@@ -102,123 +90,193 @@ int GetSocket()
 	return s;
 }
 
+//Let's you know if you are connected to a socket or not.
+bool Connected()
+{
+	return bConnected;
+}
+
 //Your network information, including your computer's IP.
 sockaddr_in MyNetwork()
 {
- return si_me;
+	return si_me;
 }
 
 //The network information of the last person you received data from.
 sockaddr_in ServerNetwork()
 {
- return si_other;
+	return si_other;
 }
 
-//Connects to a port of your choosing to create the hole-punch.
-bool Connect(unsigned short ip_port)
-{
-	if (bConnected)
-		return false;
-
-	if (!bConnected)
-	{
-		if (WSAStartup(MAKEWORD(2,2),&wsa) != 0)
-		{
-		}
-
-		if ( (s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1)
-		{
-		}
-		else
-		{
-			memset((char *) &si_me, 0, sizeof(si_me));
-			si_me.sin_family = AF_INET;
-			si_me.sin_port = htons(ip_port); // This is not really necessary, we can also use 0 (any ip_port)
-			si_me.sin_addr.s_addr = htonl(INADDR_ANY);
-
-			if( bind(s ,(struct sockaddr *)&si_me , sizeof(si_me)) == SOCKET_ERROR)
-			{
-				printf("Bind failed with error code : %d" , WSAGetLastError());
-				return false;
-			}
-
-			slen = sizeof(si_other);
-			bConnected = true;
-		}
-	}
-	return true;
-}
-
-//Send data to an IP of your choice. 
-bool SendToIp(char* server_ip, const char* message)
-{
-
-	if (!bConnected)
-		return false;
-
-	server_ip = (char *)(LPCTSTR)server_ip;
-
-	memset((char *) &si_other, 0, sizeof(si_other));
-	si_other.sin_family = AF_INET;
-	si_other.sin_port = si_me.sin_port;
-	si_other.sin_addr.s_addr = inet_addr(server_ip);
-	server.host = si_other.sin_addr.s_addr;
-	server.port = si_other.sin_port;
-
-	if (sendto(s, message, strlen(message), 0, (struct sockaddr*)(&si_other), slen) == -1)
-	{
-		return false;
-	}
-	else
-	{
-		return true;
-	}
-}
-
-//Returns true if you receive data in your connected socket, also returns the data that you received.
-bool received(char* &msg)
-{
-	if (recvfrom(GetSocket(), buf, 4096, 0, (struct sockaddr *) &si_other, &slen) != -1)
-	{
-
-		msg = buf;
-		return true;
-	}
-else
-	{
-		return false;
-	}
-}
-
-//This is SendToIP(), but it sends a message to the last IP it received a message from.
-//Therefore, this is literally replying.
-bool Reply(char* message)
-{
-
-	if (!bConnected)
-		return false;
-	
-	int slen = sizeof(si_other);
-
-	if (sendto(s, message, strlen(message), 0, (struct sockaddr*)(&si_other), slen) == -1)
-	{
-		return false;
-	}
-	else
-	{
-		return true;
-	}
-}
-
-//Disconnect from the socket that you're connected to.
 void Disconnect()
 {
 	if (bConnected)
 	{
 		closesocket(s);
 		WSACleanup();
+		bConnected = false;
 	}
 }
+
+//Connects to a port of your choosing to create the hole-punch.
+bool Connect(int ip_port)
+{
+	//Disconnect from the last socket before we connect to another.
+	if (bConnected)
+		Disconnect();
+
+	if (!bConnected)
+	{
+		if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0)
+		{
+			outputboi = "WSA cannot start.";
+			return false;
+		}
+
+		if ((s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0)
+		{
+			s = 0;
+			outputboi = "Cannot make socket.";
+			return false;
+		}
+		else
+		{
+			memset((char*)&si_me, 0, sizeof(si_me));
+			si_me.sin_family = AF_INET;
+			si_me.sin_port = htons(ip_port);
+			si_me.sin_addr.s_addr = htonl(INADDR_ANY);
+
+			if (bind(s, (sockaddr*)&si_me, sizeof(si_me)) < 0)
+			{
+				s = 0;
+				outputboi = "Cannot bind socket";
+				return false;
+			}
+			slen = sizeof(si_me);
+		}
+	}
+	bConnected = true;
+	return true;
+}
+
+// check if a given string is a numeric string or not
+bool isNumber(const std::string& str)
+{
+	// `std::find_first_not_of` searches the string for the first character
+	// that does not match any of the characters specified in its arguments
+	return !str.empty() &&
+		(str.find_first_not_of("[0123456789]") == std::string::npos);
+}
+
+// Function to split string `str` using a given delimiter
+std::vector<std::string> split(const std::string& str, char delim)
+{
+	auto i = 0;
+	std::vector<std::string> list;
+
+	auto pos = str.find(delim);
+
+	while (pos != std::string::npos)
+	{
+		list.push_back(str.substr(i, pos - i));
+		i = ++pos;
+		pos = str.find(delim, pos);
+	}
+
+	list.push_back(str.substr(i, str.length()));
+
+	return list;
+}
+
+// Function to validate an IP address
+bool validateIP(std::string ip)
+{
+	// split the string into tokens
+	std::vector<std::string> list = split(ip, '.');
+
+	// if the token size is not equal to four
+	if (list.size() != 4)
+		return false;
+
+	return true;
+}
+
+//Send data to an IP of your choice.
+bool SendToIp(const char* server_ip = "", const char* message = "")
+{
+	char broadcast = '1';
+
+	if (!bConnected)
+		return false;
+
+	if (!validateIP(server_ip))
+		return false;
+
+	if (message == "")
+		return false;
+
+	if (setsockopt(s, SOL_SOCKET, SO_BROADCAST, &broadcast, sizeof(broadcast)) < 0)
+	{
+		closesocket(s);
+		return false;
+	}
+
+
+	server_ip = (char*)(LPCTSTR)server_ip;
+
+	memset((char*)&si_other, 0, sizeof(si_other));
+	si_other.sin_family = AF_INET;
+	si_other.sin_port = si_me.sin_port;
+
+	if (server_ip != "255.255.255.255")
+		si_other.sin_addr.s_addr = inet_addr(server_ip);
+	else
+		si_other.sin_addr.s_addr = INADDR_BROADCAST;
+
+	server.host = si_other.sin_addr.s_addr;
+	server.port = si_other.sin_port;
+
+	if (sendto(s, message, sizeof(message), 0, (struct sockaddr*)(&si_other), slen) == -1)
+		return false;
+	else
+	{
+		lastSent = (char*)message;
+		return true;
+	}
+}
+
+//Returns true if you receive data in your connected socket, also returns the data that you received.
+bool received(char*& msg)
+{
+	if (recvfrom(GetSocket(), buf, BUFLEN, 0, (struct sockaddr*)&si_other, &slen) != -1)
+	{
+		if (msg == lastSent)
+			return false;
+
+		msg = buf;
+		return true;
+	}
+	else
+		return false;
+}
+
+//This is SendToIP(), but it sends a message to the last IP it received a message from.
+//Therefore, this is literal replying.
+bool Reply(char* message)
+{
+
+	if (!bConnected)
+		return false;
+
+	int slen = sizeof(si_other);
+
+	if (sendto(s, message, strlen(message), 0, (struct sockaddr*)(&si_other), slen) == -1)
+		return false;
+	else
+		return true;
+}
+
+//Disconnect from the socket that you're connected to.
 
 
 
@@ -228,11 +286,11 @@ void Disconnect()
 const char* NormalizeString(char* in)
 {
 
-	for (int i=0;i<strlen(in);i++)
-		{
-			if ( (in[i]  < 31) || (in[i] > 126) ) 
-				in[i] = 0;
-		}
+	for (int i = 0; i < strlen(in); i++)
+	{
+		if ((in[i] < 31) || (in[i] > 126))
+			in[i] = 0;
+	}
 	return in;
 
 }
@@ -246,204 +304,82 @@ bool SameThing(const char* in1, const char* in2)
 	return (i1.compare(i2) == 0);
 }
 
-//Let's you know if a specified file exists.
-bool fileexists (CString name) 
-{
-    struct stat buffer;
-    return (stat (name, &buffer) ==0);
-}
-
-//Load an entire file into a string.
-std::string loadfile(CString name) 
-{
-	std::string contents;
-	
-    if (fileexists(name))
-	{
-		ifstream input(name);
-		
-		for (std::string line; getline(input, line); )
-		{
-		 contents += line;	
-		}
-	}
-    return contents;
-}
-
-//Quick-and-easy file-writing function. Only writes a new file,
-//and will not work if the file name specified already exists.
-bool writefile(CString name, CString contents)
-{
-	if (name == "")
-		return false;
-
-	if (contents == "")
-		return false;
-
-	if (fileexists(name))
-		return false;
-
-	ofstream MyFile(name);
-	MyFile << contents;
-	MyFile.close();
-	return true;
-}
-
-//Quick-and-easy function that writes to the end of a file. Only
-//writes to files that already exist.
-bool appendfile(CString name, CString contents)
-{
-	if (name == "")
-		return false;
-
-	if (contents == "")
-		return false;
-
-	if (!fileexists(name))
-		return false;
-
-	ofstream MyFile(name);
-	MyFile << contents;
-	MyFile.close();
-	return true;
-}
-
-//Quick-and-easy function that searches for text in a file.
-//returns true if it finds some. Super freaking simple.
-bool foundinfile(CString name, CString contents)
-{
-	if (name == "")
-		return false;
-
-	if (contents == "")
-		return false;
-
-	if (!fileexists(name))
-		return false;
-
-	std::string searching = loadfile(name);
-
-	return (searching.find(contents) != string::npos );
-
-}
-
-
-//Loads a file (configfile, if it can find it) and looks for a keyword (value)
-//that has '=' after it, and reads whatever text comes after the '='. If
-//it finds anything, it will set what it finds to the result variable and 
-//return true to let the user know that it indeed found something.
-//This is usually used for INI configuration files, but the format can be
-//anything.
-bool getconfig(CString configfile, CString value, CString &result ) 
-{
-	std::string contents;
-
-	bool bResult = false;
-	
-    if (fileexists(configfile))
-	{
-		ifstream input(configfile);
-		
-		for (std::string line; getline(input, line);)
-		{
-		 if (line.substr(0,value.GetLength()) == (LPCSTR)value)
-		 {
-			 result = line.substr(value.GetLength()+1,line.length() - value.GetLength()-1).c_str();
-
-			 if (result.GetLength() > 0)
-				bResult = true;
-		 }
-		}
-	}
-    return bResult;
-}
-
-//A useful CString to Unsigned Short converting function that I whipped together.
-//Used this for fetching port numbers from strings.
-unsigned short cstous(CString in)
-{
-	return (unsigned short)strtol(in.GetBuffer(in.GetLength()),NULL,10);
-}
-
-
 //Same as received(), but this has the ability to timeout.
-bool received_timeout(char* &msg, long sec, long usec)
+bool received_timeout(char*& msg, long sec, long usec)
 {
-   fd_set readfds, masterfds;
-   struct timeval timeout={sec,usec};
- 
-   if (!Connected())
-	   return false;
+	fd_set readfds, masterfds;
+	struct timeval timeout = { sec,usec };
 
-   FD_ZERO(&masterfds);
-   FD_SET(GetSocket(), &masterfds);
+	if (!Connected())
+		return false;
 
-   memcpy(&readfds, &masterfds, sizeof(fd_set));
+	FD_ZERO(&masterfds);
+	FD_SET(GetSocket(), &masterfds);
 
-   if (select(GetSocket()+1, &readfds, NULL, NULL, &timeout) < 0)
-   {
-     return false;
-   }
+	memcpy(&readfds, &masterfds, sizeof(fd_set));
 
-   if (FD_ISSET(GetSocket(), &readfds))
-   {
-		if (recvfrom(GetSocket(), buf, 4096, 0, (struct sockaddr *) &si_other, &slen) != 1)
+	if (select(GetSocket(), &readfds, NULL, NULL, &timeout) < 0)
+		return false;
+
+	if (FD_ISSET(GetSocket(), &readfds))
+	{
+		if (recvfrom(GetSocket(), buf, 4096, 0, (struct sockaddr*)&si_other, &slen) != 1)
 		{
+			if (msg == lastSent)
+				return false;
+
 			msg = buf;
 			return true;
 		}
-	 else
-		 return false;
-   }
+		else
+			return false;
+	}
 	else
 		return false;
 }
 
-CString EpochSeconds()
+std::string NewTag(std::string tagLabel, std::string contents)
 {
-	CString f;
-	time_t result = time(NULL);
-    asctime(localtime(&result));
-
-	char temp[20];
-	long ld = result;
-	sprintf(temp,"%ld",ld);
-
-	f += temp;
-
-	return f;
-
-	
+	return "<" + tagLabel + ">" + contents + "</" + tagLabel + ">";
 }
 
-//Takes a float and turns it to bytes, handy for writing it to a file or a string
-//for later parsing and packet-sending, etc.
-byte* floatToBytes(float thefloat)
+std::string GetTag(std::string tagName, std::string data)
 {
-	byte* out;
+	std::string mustfindthis = "<" + tagName + ">";
+	std::string andthis = "</" + tagName + ">";
 
-	for (int i=0; i < sizeof(thefloat); i++)
-		out[i] = ((byte*)&thefloat)[i];
+	int fl = data.find(mustfindthis);
+	int sl = data.find(andthis);
 
-	return out;
+	if ((fl == -1) || (sl == -1))
+		return "";
+
+	return data.substr(fl + mustfindthis.length(), sl - (fl + mustfindthis.length()));
 }
 
-//Takes an array of bytes that <we assume> define a float, and turn them into
-//a readable float. handy for parsing strings, receiving packets, etc.
-float bytesToFloat(byte* floatdata)
+bool fileexists(std::string name)
 {
-	return *(float*)&floatdata;
+	struct stat buffer;
+	return (stat(name.c_str(), &buffer) == 0);
 }
 
-//-Added float to byte conversion to send/receive in packet-form.
-//-Added EpochSeconds(), returns the current time in Epoch format, as a CString.
-//-Added Basic file-handling functions that return true or false if they successfully processed.
-//-File-handling functions are loadfile(), writefile(), appendfile() and foundinfile().
-//-Now featuring a Command Prompt-friendly version of this library, PeerToPeer_Win32.h, that uses 
-// CString as a substitute for CString, which is used in MFC Applications. I did that because
-// I have had trouble trying to load CStrings into console applications.
-//-Added an example MFC program that does Peer-to-Peer chat, used port 6969 as an example.
-// Type in a username, and IP to send a message to and the message itself.
-// When you receive a message, you don't need to type in an IP, the program will send your message
-// to the last IP you received a message to.
+bool writefile(std::string name, std::string contents)
+{
+	if ( (name == "") || (contents == "") )
+		return false;
 
+	if (fileexists(name))
+		DeleteFile(name.c_str());
+
+	std::ofstream myfile;
+
+	if (myfile.good())
+	{
+		myfile.open(name, std::ofstream::out);
+		myfile.write(contents.c_str(), contents.length());
+		myfile.close();
+		return true;
+	}
+	else
+		return false;
+}
